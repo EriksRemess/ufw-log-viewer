@@ -31,6 +31,13 @@ If you do not pass a path, the app checks logs in this order:
 2. `/var/log/ufw.log`
 3. `/var/log/kern.log`
 
+Quick CLI:
+
+```bash
+ufw-log-viewer --help
+ufw-log-viewer --version
+```
+
 ## Controls
 
 - `F1..F6`: edit filters

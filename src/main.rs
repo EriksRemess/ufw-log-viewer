@@ -1810,12 +1810,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
     frame.render_widget(help, chunks[4]);
 }
 
-fn resolve_log_path_from_args() -> PathBuf {
-    let arg_path = std::env::args().nth(1).map(PathBuf::from);
-    if let Some(path) = arg_path {
-        return path;
-    }
-
+fn resolve_default_log_path() -> PathBuf {
     let preferred = PathBuf::from("/var/log/ufw-firewall.log");
     if preferred.exists() {
         return preferred;
@@ -1829,7 +1824,58 @@ fn resolve_log_path_from_args() -> PathBuf {
     PathBuf::from("/var/log/kern.log")
 }
 
-fn run_app() -> Result<(), Box<dyn std::error::Error>> {
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum CliAction {
+    Run(PathBuf),
+    PrintHelp,
+    PrintVersion,
+}
+
+fn parse_cli_action(args: &[String], default_log_path: PathBuf) -> Result<CliAction, String> {
+    if args.is_empty() {
+        return Ok(CliAction::Run(default_log_path));
+    }
+
+    let first = args[0].as_str();
+    match first {
+        "-h" | "--help" => {
+            if args.len() > 1 {
+                Err(format!("Unexpected argument after {}: {}", first, args[1]))
+            } else {
+                Ok(CliAction::PrintHelp)
+            }
+        }
+        "-V" | "--version" => {
+            if args.len() > 1 {
+                Err(format!("Unexpected argument after {}: {}", first, args[1]))
+            } else {
+                Ok(CliAction::PrintVersion)
+            }
+        }
+        _ if first.starts_with('-') => Err(format!("Unknown option: {}", first)),
+        _ => {
+            if args.len() > 1 {
+                Err(format!("Unexpected extra argument: {}", args[1]))
+            } else {
+                Ok(CliAction::Run(PathBuf::from(first)))
+            }
+        }
+    }
+}
+
+fn print_help() {
+    println!(
+        "{name} {version}\n\nUsage:\n  {name} [LOG_PATH]\n\nOptions:\n  -h, --help       Show this help\n  -V, --version    Show version\n\nIf LOG_PATH is not provided, the app checks:\n  1) /var/log/ufw-firewall.log\n  2) /var/log/ufw.log\n  3) /var/log/kern.log",
+        name = env!("CARGO_PKG_NAME"),
+        version = env!("CARGO_PKG_VERSION"),
+    );
+}
+
+fn print_version() {
+    println!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+}
+
+fn run_app(log_path: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     struct TerminalCleanup;
     impl Drop for TerminalCleanup {
         fn drop(&mut self) {
@@ -1843,8 +1889,6 @@ fn run_app() -> Result<(), Box<dyn std::error::Error>> {
             );
         }
     }
-
-    let log_path = resolve_log_path_from_args();
 
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -1984,8 +2028,20 @@ fn run_app() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn main() {
-    if let Err(err) = run_app() {
-        eprintln!("Error: {}", err);
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    match parse_cli_action(&args, resolve_default_log_path()) {
+        Ok(CliAction::PrintHelp) => print_help(),
+        Ok(CliAction::PrintVersion) => print_version(),
+        Ok(CliAction::Run(log_path)) => {
+            if let Err(err) = run_app(log_path) {
+                eprintln!("Error: {}", err);
+            }
+        }
+        Err(err) => {
+            eprintln!("Error: {}\n", err);
+            print_help();
+            std::process::exit(2);
+        }
     }
 }
 
@@ -2126,6 +2182,43 @@ mod tests {
         assert_eq!(
             selected_position_for_raw(&entries, &filtered, "missing"),
             None
+        );
+    }
+
+    #[test]
+    fn parse_cli_action_handles_help_and_version() {
+        let default = PathBuf::from("/tmp/default.log");
+        assert_eq!(
+            parse_cli_action(&["--help".to_string()], default.clone()).unwrap(),
+            CliAction::PrintHelp
+        );
+        assert_eq!(
+            parse_cli_action(&["--version".to_string()], default.clone()).unwrap(),
+            CliAction::PrintVersion
+        );
+        assert_eq!(
+            parse_cli_action(&["/var/log/ufw.log".to_string()], default.clone()).unwrap(),
+            CliAction::Run(PathBuf::from("/var/log/ufw.log"))
+        );
+        assert_eq!(
+            parse_cli_action(&Vec::new(), default).unwrap(),
+            CliAction::Run(PathBuf::from("/tmp/default.log"))
+        );
+    }
+
+    #[test]
+    fn parse_cli_action_rejects_unknown_or_extra_args() {
+        let default = PathBuf::from("/tmp/default.log");
+        assert!(parse_cli_action(&["--bogus".to_string()], default.clone()).is_err());
+        assert!(
+            parse_cli_action(&["--help".to_string(), "x".to_string()], default.clone()).is_err()
+        );
+        assert!(
+            parse_cli_action(
+                &["/tmp/a.log".to_string(), "/tmp/b.log".to_string()],
+                default
+            )
+            .is_err()
         );
     }
 }
