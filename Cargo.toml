@@ -1,0 +1,24 @@
+[package]
+name = "ufw-log-viewer"
+version = "0.1.0"
+edition = "2024"
+description = "UFW Log Viewer - a simple terminal UI for browsing and filtering UFW logs"
+license = "MIT"
+
+[package.metadata.deb]
+maintainer = "Ēriks Remess <eriks@remess.lv>"
+copyright = "2026, Ēriks Remess"
+depends = "$auto"
+section = "utils"
+priority = "optional"
+extended-description = """\
+UFW Log Viewer is a lightweight terminal UI for reading and filtering UFW logs by
+service, port, IP, action, protocol, direction, interface, and text.
+"""
+assets = [
+  ["target/release/ufw-log-viewer", "usr/bin/", "755"],
+]
+
+[dependencies]
+crossterm = "0.29.0"
+ratatui = "0.29.0"
