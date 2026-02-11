@@ -15,9 +15,6 @@ extended-description = """\
 UFW Log Viewer is a lightweight terminal UI for reading and filtering UFW logs by
 service, port, IP, action, protocol, direction, interface, and text.
 """
-assets = [
-  ["target/release/ufw-log-viewer", "usr/bin/", "755"],
-]
 
 [dependencies]
 crossterm = "0.29.0"

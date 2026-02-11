@@ -1,6 +1,6 @@
 # UFW Log Viewer
 
-Simple Rust TUI for reading and filtering UFW logs.
+A small terminal app for browsing and filtering UFW logs.
 
 ## Build
 
@@ -26,7 +26,7 @@ Optional log path:
 ufw-log-viewer /path/to/ufw.log
 ```
 
-Default log lookup order:
+If you do not pass a path, the app checks logs in this order:
 1. `/var/log/ufw-firewall.log`
 2. `/var/log/ufw.log`
 3. `/var/log/kern.log`
@@ -35,13 +35,26 @@ Default log lookup order:
 
 - `F1..F6`: edit filters
 - `Shift+F1..F6`: clear one filter
-- `a`: pause/resume live updates
-- `,` / `.`: change interface
-- `Ctrl+C`: copy selected row
-- `Ctrl+I`: copy selected source IP
-- `Left` / `Right`: scroll selected log entry text
+- `a`: pause or resume live updates
+- `,` / `.`: switch interface
+- `Ctrl+C`: copy the selected row
+- `Ctrl+I`: copy the selected source IP
+- `Left` / `Right`: scroll long log-entry text
+- On wider screens, service descriptions are shown
+
+## Service Data
+
+Service names and descriptions come from IANA and are embedded into the binary.
+
+To refresh the local CSV snapshot:
+
+```bash
+./scripts/update_iana_services.sh
+```
 
 ## Debian Package
+
+Prebuilt `.deb` packages are also published in GitHub Releases.
 
 ```bash
 make deb

@@ -12,6 +12,14 @@ permissions:
 jobs:
   build-deb:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            arch: amd64
+          - target: aarch64-unknown-linux-gnu
+            arch: arm64
 
     steps:
       - name: Checkout
@@ -19,9 +27,17 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
+
+      - name: Install cross linker for arm64
+        if: matrix.arch == 'arm64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross
 
       - name: Install cargo-deb
         run: cargo install cargo-deb --locked
@@ -41,27 +57,43 @@ jobs:
           fi
 
       - name: Build release binary
-        run: cargo build --release --locked
+        run: cargo build --release --locked --target "${{ matrix.target }}"
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
 
       - name: Build Debian package
-        run: cargo deb --no-build
-
-      - name: Generate checksums
-        run: |
-          cd target/debian
-          sha256sum *.deb > SHA256SUMS
+        run: cargo deb --no-build --target "${{ matrix.target }}"
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
 
       - name: Upload CI artifact
         uses: actions/upload-artifact@v4
         with:
-          name: deb-packages
-          path: target/debian/*
+          name: deb-packages-${{ matrix.arch }}
+          path: target/debian/*.deb
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build-deb
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download deb artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: deb-packages-*
+          merge-multiple: true
+          path: dist
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum *.deb > SHA256SUMS
 
       - name: Upload release assets
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           files: |
-            target/debian/*.deb
-            target/debian/SHA256SUMS
+            dist/*.deb
+            dist/SHA256SUMS
