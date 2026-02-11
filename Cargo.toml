@@ -1,6 +1,6 @@
 [package]
 name = "ufw-log-viewer"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2024"
 description = "UFW Log Viewer - a simple terminal UI for browsing and filtering UFW logs"
 license = "MIT"
