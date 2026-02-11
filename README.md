@@ -2,6 +2,8 @@
 
 A small terminal app for browsing and filtering UFW logs.
 
+![UFW Log Viewer preview](preview.png)
+
 ## Build
 
 ```bash
